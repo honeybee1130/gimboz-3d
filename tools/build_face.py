@@ -6,7 +6,14 @@ bpy.ops.import_scene.gltf(filepath=SRC)
 if 'Icosphere' in bpy.data.objects: bpy.data.objects.remove(bpy.data.objects['Icosphere'])
 arm=bpy.data.objects['Armature']
 body=bpy.data.objects['Body_Mosshopper']; mouth=bpy.data.objects['Mouth_GEO']; eyes=bpy.data.objects['PossessedGreen_Eyes']
-LINE_Z=0.645; XLIM=0.165
+import json as _json, os as _os
+_fit=_json.load(open(_os.path.join(_os.path.dirname(_os.path.abspath(__file__)),'crease_fit.json')))['coef']
+def crease(x):
+    x=max(-0.165,min(0.165,x)); v=0.0
+    for c in _fit: v=v*x+c
+    return v
+LINE_Z=crease(0.0); XLIM=0.165
+print('mouth line z at centre %.4f, at corners %.4f'%(LINE_Z,crease(0.16)))
 def clamp(x,a=0,b=1): return max(a,min(b,x))
 def sstep(e0,e1,x):
     t=clamp((x-e0)/(e1-e0)); return t*t*(3-2*t)
@@ -14,7 +21,21 @@ def sstep(e0,e1,x):
 # ---------- 1. cut a seam along the mouth line in the body ----------
 bm=bmesh.new(); bm.from_mesh(body.data)
 mw=body.matrix_world; inv=mw.inverted()
-region=[f for f in bm.faces if all((abs((mw@v.co).x)<XLIM and (mw@v.co).y<-0.08 and 0.58<(mw@v.co).z<0.71) for v in f.verts)]
+# warp so the curved mouth line becomes the flat plane z=LINE_Z, cut, then unwarp (new verts included)
+_warped=set(); _orig=set(bm.verts)
+def warp(sign):
+    if sign>0:
+        for v in bm.verts:
+            w=mw@v.co
+            if abs(w.x)<0.24 and w.y<0.0 and 0.50<w.z<0.80:
+                w.z+=LINE_Z-crease(w.x); v.co=inv@w; _warped.add(v)
+    else:
+        # exactly the verts we moved, plus every vert the cut/split created (all inside the region)
+        for v in bm.verts:
+            if v in _warped or v not in _orig:
+                w=mw@v.co; w.z-=LINE_Z-crease(w.x); v.co=inv@w
+warp(+1)
+region=[f for f in bm.faces if all((abs((mw@v.co).x)<XLIM and (mw@v.co).y<-0.08 and 0.60<(mw@v.co).z<0.74) for v in f.verts)]
 geom=list(set([v for f in region for v in f.verts]+[e for f in region for e in f.edges]+region))
 pno=(inv.to_3x3().transposed()@Vector((0,0,1))).normalized(); pco=inv@Vector((0,0,LINE_Z))
 res=bmesh.ops.bisect_plane(bm,geom=geom,dist=1e-5,plane_co=pco,plane_no=pno,use_snap_center=False,clear_outer=False,clear_inner=False)
@@ -22,6 +43,7 @@ cut_edges=[g for g in res['geom_cut'] if isinstance(g,bmesh.types.BMEdge)]
 # keep the seam short of the corners so the halves stay attached there
 cut_edges=[e for e in cut_edges if all(abs((mw@v.co).x)<XLIM-0.012 for v in e.verts)]
 bmesh.ops.split_edges(bm,edges=cut_edges)
+warp(-1)
 bm.to_mesh(body.data); bm.free(); body.data.update()
 print('seam edges',len(cut_edges),'body verts now',len(body.data.vertices))
 
@@ -43,6 +65,13 @@ bm.free()
 comps.sort(key=lambda c:-len(c)); upper,lower,inner=comps[0],comps[1],comps[2]
 UP,LO,IN=isl[upper[0]],isl[lower[0]],isl[inner[0]]
 
+def clamp(x,a=0,b=1): return max(a,min(b,x))
+MOUTH_LIFT=LINE_Z-0.647
+# full lift at the lips, tapering to zero at the roof (z 0.774) so the hidden mouth never rises into the eye sockets
+for v in mouth.data.vertices:
+    w=mouth.matrix_world@v.co; t=1-clamp((w.z-0.68)/0.035)   # lips lift fully, anything above z 0.715 stays put (sockets start at 0.67 behind the skin)
+    v.co=mouth.matrix_world.inverted()@(w+Vector((0,0,MOUTH_LIFT*t)))
+mouth.data.update(); print('interior mouth lifted by %.4f'%MOUTH_LIFT)
 W={o.name:[o.matrix_world@v.co for v in o.data.vertices] for o in (body,mouth,eyes)}
 # body: which side of the seam a vert sits on (by linked-face centroid)
 bm=bmesh.new(); bm.from_mesh(body.data); bm.verts.ensure_lookup_table()
@@ -50,7 +79,7 @@ side=[0]*len(bm.verts)
 for v in bm.verts:
     if v.link_faces:
         cz=sum(((mw@f.calc_center_median()).z) for f in v.link_faces)/len(v.link_faces)
-        side[v.index]=-1 if cz<LINE_Z else 1
+        cx=sum(((mw@f.calc_center_median()).x) for f in v.link_faces)/len(v.link_faces); side[v.index]=-1 if cz<crease(cx) else 1
 bm.free()
 kd_m=kdtree.KDTree(len(W['Mouth_GEO']))
 for n,p in enumerate(W['Mouth_GEO']): kd_m.insert(p,n)
@@ -58,7 +87,7 @@ kd_m.balance()
 
 def wx(x): return 1-sstep(0.12,0.21,abs(x))
 def wj(x): return 1-sstep(0.06,XLIM-0.012,abs(x))   # jaw opening tapers to zero exactly where the seam ends
-def wz_low(z): return sstep(0.44,0.60,z)          # 1 at the lip, fades out down the belly
+def wz_low(z): return sstep(LINE_Z-0.205,LINE_Z-0.045,z)          # 1 at the lip, fades out down the belly
 jaw_w={}; prox_w={}
 for oname,pts in W.items():
     jw=[0.0]*len(pts); pw=[0.0]*len(pts)
@@ -66,11 +95,11 @@ for oname,pts in W.items():
         if oname=='Mouth_GEO':
             k=isl[i]
             if k==LO: jw[i]=wj(p.x)*max(0.25,wz_low(p.z))
-            elif k==IN: jw[i]=wj(p.x)*(1-sstep(0.60,0.645,p.z))
+            elif k==IN: jw[i]=wj(p.x)*(1-sstep(LINE_Z-0.045,LINE_Z,p.z))
             pw[i]=wx(p.x)
         elif oname=='Body_Mosshopper':
             if p.y>0.05 or abs(p.x)>0.24 or p.z<0.40 or p.z>0.80: continue
-            if side[i]<0 and p.z<=LINE_Z+0.002:
+            if side[i]<0 and p.z<=crease(p.x)+0.002:
                 jw[i]=wj(p.x)*wz_low(p.z)*(1-sstep(-0.02,0.05,p.y))
             pw[i]=(1-sstep(0.015,0.05,kd_m.find(p)[2]))*wx(p.x)
     jaw_w[oname]=jw; prox_w[oname]=pw
@@ -131,6 +160,8 @@ for vg in list(eyes.vertex_groups): eyes.vertex_groups.remove(vg)
 gl=eyes.vertex_groups.new(name='eye_l'); gr=eyes.vertex_groups.new(name='eye_r')
 gl.add([i for i,p in enumerate(W['PossessedGreen_Eyes']) if p.x>0],1.0,'REPLACE')
 gr.add([i for i,p in enumerate(W['PossessedGreen_Eyes']) if p.x<=0],1.0,'REPLACE')
+for o in (body,mouth,eyes):
+    for kb in o.data.shape_keys.key_blocks: kb.value=0.0
 # sanity: every body vert still skinned
 unw=sum(1 for v in body.data.vertices if not v.groups or sum(g.weight for g in v.groups)<0.5)
 print('body verts with weak skin weights',unw)

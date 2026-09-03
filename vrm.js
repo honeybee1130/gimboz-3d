@@ -82,8 +82,10 @@
       if (!(BONES[req] in byName)) throw new Error(`Required bone ${BONES[req]} not found; is this a Gimboz GLB?`);
 
     // --- expressions: bind every mesh that carries a named morph target ---
+    // Default morph weights must be 0 or the importer shows every expression at once (Blender can export them as 1).
     const groups = {};
     (json.meshes || []).forEach((m, mi) => {
+      if (Array.isArray(m.weights)) m.weights = m.weights.map(() => 0);
       const names = (m.extras && m.extras.targetNames) || [];
       names.forEach((n, ti) => {
         const preset = PRESETS[n]; if (!preset) return;
@@ -96,6 +98,7 @@
     report.expressions = Object.keys(groups);
 
     // --- face the VRM 0.x way: 0.x models face -Z in glTF, our GLB faces +Z, so yaw the scene root 180deg ---
+    nodes.forEach((n) => { if (Array.isArray(n.weights)) n.weights = n.weights.map(() => 0); });
     const scene = json.scenes[json.scene || 0];
     if (opts.flip !== false) {
       let rootIdx;
