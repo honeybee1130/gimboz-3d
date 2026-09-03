@@ -49,7 +49,7 @@ const { buffer, report } = GimbozVRM.convert(glbArrayBuffer, { title: 'Gimboz #1
 - Yaws the root 180° because VRM 0.x models face -Z in glTF and the Gimboz GLBs face +Z. If you preview a converted VRM in a plain glTF viewer you will see its back; that is correct.
 - Also works in Node (`require('./vrm.js')`) for batch or testing.
 
-Known-good in structure; as of the first commit the real Warudo / VSeeFace load test is still pending. If a model faces away from the camera in Warudo, set `opts.flip = false` and report back.
+Verified loading in Warudo (stock and face-rigged, no errors in `Player.log`). Note that **Warudo lists VRMs by `meta.title`, not filename**, so the `title` option is what users see in the character dropdown; the site passes the on-chain name (`GIMBOZ #1014`).
 
 ## `tools/` (offline, optional)
 
