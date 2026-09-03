@@ -1,0 +1,108 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>GIMBOZ 3D PULL</title>
+<meta name="description" content="Enter your Gimboz token ID, get the 3D model. GLB, MML tag, PFP and raw metadata straight from the on-chain source.">
+<link rel="icon" href="assets/Logomark_Color.png">
+<link rel="stylesheet" href="styles.css">
+<script type="module" src="https://cdn.jsdelivr.net/npm/@google/model-viewer@4.0.0/dist/model-viewer.min.js"></script>
+</head>
+<body>
+<header class="top">
+  <a class="brand" href="https://ape.church" target="_blank" rel="noopener"><img src="assets/Logo_HorizontalText_White.png" alt="Ape Church"></a>
+  <span class="tag">GIMBOZ 3D PULL</span>
+</header>
+
+<main>
+  <section class="hero">
+    <h1>GET YOUR<br><span class="g">GIMBO IN 3D</span></h1>
+    <p class="sub">Type a token ID. We pull the GLB, the MML tag and the PFP straight from the same bucket the contract points to. No wallet, no login, no key.</p>
+    <form id="form" class="pull" autocomplete="off" novalidate>
+      <label class="field">
+        <span class="hash">#</span>
+        <input id="tokenId" type="number" inputmode="numeric" min="1" max="4443" placeholder="1 to 4443" required>
+      </label>
+      <button type="submit" class="btn primary" id="pullBtn">PULL</button>
+      <button type="button" class="btn ghost" id="randomBtn" title="Random gimbo">RANDOM</button>
+    </form>
+    <p id="status" class="status" aria-live="polite"></p>
+    <div id="recent" class="recent" hidden></div>
+  </section>
+
+  <section id="result" class="result" hidden>
+    <div class="viewer-wrap">
+      <model-viewer id="viewer"
+        camera-controls auto-rotate auto-rotate-delay="800" rotation-per-second="18deg"
+        shadow-intensity="1" exposure="1.05" environment-image="neutral"
+        camera-orbit="0deg 82deg 2.4m" min-camera-orbit="auto auto 1.2m" max-camera-orbit="auto auto 5m"
+        interaction-prompt="none" alt="Gimboz 3D model">
+        <div slot="progress-bar" class="pbar"><div id="pbarFill" class="pbar-fill"></div></div>
+      </model-viewer>
+      <div class="viewer-hud">
+        <span id="glbSize" class="mono"></span>
+        <button type="button" class="btn tiny" id="resetCam">RESET VIEW</button>
+      </div>
+    </div>
+
+    <div class="panel">
+      <div class="head">
+        <img id="pfp" class="pfp" alt="">
+        <div>
+          <h2 id="name">GIMBOZ #—</h2>
+          <div id="traits" class="traits"></div>
+        </div>
+      </div>
+
+      <div class="downloads">
+        <div class="row">
+          <button type="button" class="btn primary wide" id="dlGlb">DOWNLOAD GLB <span id="dlGlbNote" class="note"></span></button>
+          <button type="button" class="btn primary wide" id="dlVrm">DOWNLOAD VRM <span id="dlVrmNote" class="note"></span></button>
+        </div>
+        <p class="hint">VRM is built in your browser from the GLB (VRM 0.x, humanoid bones mapped, no upload). Body tracking works in Warudo / VSeeFace. Face blendshapes need the face rig, coming later.</p>
+        <div class="row">
+          <a class="btn" id="dlPfp" download target="_blank" rel="noopener">PFP PNG</a>
+          <a class="btn" id="dlJson" download target="_blank" rel="noopener">METADATA JSON</a>
+          <button type="button" class="btn" id="copyMml">COPY MML TAG</button>
+          <button type="button" class="btn" id="copyUrl">COPY GLB URL</button>
+        </div>
+        <div class="row links">
+          <a id="lnkOpensea" target="_blank" rel="noopener">OpenSea ↗</a>
+          <a id="lnkApescan" target="_blank" rel="noopener">Apescan ↗</a>
+          <a id="lnkShare" href="#">Share link ↗</a>
+        </div>
+      </div>
+
+      <details class="raw">
+        <summary>WHERE THIS COMES FROM</summary>
+        <ol class="chain">
+          <li><span class="k">contract</span> <code class="mono">0x81C9ce55E8214Fd0f5181FD3D38f52fD8c33Ec38</code> on ApeChain</li>
+          <li><span class="k">tokenURI(id)</span> <code class="mono" id="cUri"></code></li>
+          <li><span class="k">json.glb</span> <code class="mono" id="cGlb"></code></li>
+          <li><span class="k">json.mml</span> <code class="mono" id="cMml"></code></li>
+        </ol>
+        <pre id="rawJson" class="mono"></pre>
+      </details>
+    </div>
+  </section>
+
+  <section class="howto">
+    <h3>WHAT TO DO WITH IT</h3>
+    <div class="steps">
+      <div class="step"><span class="n">01</span><h4>OTHERSIDE / MML</h4><p>Copy the MML tag and paste it into any MML document. It is already a rigged <code>&lt;m-character&gt;</code>.</p></div>
+      <div class="step"><span class="n">02</span><h4>VTUBE WITH IT</h4><p>Hit DOWNLOAD VRM, then load the file in Warudo (Character → Add → your .vrm) or VSeeFace. The conversion happens in your browser, nothing is uploaded.</p></div>
+      <div class="step"><span class="n">03</span><h4>KNOW THE LIMITS</h4><p>The stock model has a full body skeleton but no face blendshapes or eye bones. Body tracking works out of the box. Lipsync and blink need a face rig first.</p></div>
+    </div>
+  </section>
+</main>
+
+<footer class="foot">
+  <span>Gimboz · 4444 ancient frogs guarding Ape Church</span>
+  <span class="mono">source: storage.googleapis.com/gimboz-public</span>
+</footer>
+
+<script src="vrm.js"></script>
+<script src="app.js"></script>
+</body>
+</html>
